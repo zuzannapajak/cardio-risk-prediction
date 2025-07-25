@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/
+
+# Data and model outputs (optional, keep raw data elsewhere)
+data/*.csv
+data/*.xlsx
+data/*.json
+*.h5
+*.npy
+*.pkl
+*.joblib
+
+# Plot images and results
+outputs/figures/
+outputs/*.png
+outputs/*.jpg
+outputs/*.svg
+outputs/*.pdf
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Python packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs and caches
+*.log
+*.cache/
