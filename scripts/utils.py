@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import math
 import pandas as pd
 import seaborn as sns
+from sklearn.feature_selection import mutual_info_classif
 
 def create_plot_grid(n_plots, cols=3, figsize_per_plot=(5, 4)):
     """
@@ -53,6 +54,62 @@ def plot_index_column_relation(df):
     plt.tight_layout()
     plt.show()
 
+def calculate_skewness(df, threshold=0.5, sort=True):
+    """
+    Computes skewness for all numerical columns in the DataFrame.
+
+    Parameters:
+        df (pd.DataFrame): Input DataFrame.
+        threshold (float): Skewness threshold for flagging strong skew (default=0.5).
+        sort (bool): Whether to sort the output by absolute skewness descending.
+
+    Returns:
+        pd.DataFrame: DataFrame with columns ['Feature', 'Skewness', 'Skew Type'].
+    """
+    skew_values = df.select_dtypes(include='number').skew()
+    skew_df = pd.DataFrame({
+        'Feature': skew_values.index,
+        'Skewness': skew_values.values,
+        'Skew Type': ['Right-skewed' if s > threshold else
+                      'Left-skewed' if s < -threshold else
+                      'Approximately symmetric'
+                      for s in skew_values]
+    })
+
+    if sort:
+        skew_df = skew_df.reindex(skew_df['Skewness'].abs().sort_values(ascending=False).index)
+
+    return skew_df.reset_index(drop=True)
+
+def plot_violins(df, cols=3, figsize_per_plot=(5, 4)):
+    """
+    Plots violin plots for all numerical columns in the DataFrame,
+    arranged in a grid with `cols` columns.
+
+    Parameters:
+        df (pd.DataFrame): The DataFrame containing the data.
+        cols (int): Number of columns in the grid.
+        figsize_per_plot (tuple): Size of each subplot (width, height).
+    """
+    numeric_columns = df.select_dtypes(include='number').columns
+    n_plots = len(numeric_columns)
+
+    fig, axes = create_plot_grid(n_plots, cols, figsize_per_plot)
+
+    for i, col in enumerate(numeric_columns):
+        ax = axes[i]
+        sns.violinplot(y=df[col], ax=ax, inner='box', linewidth=1, color='steelblue')
+        ax.set_title(col)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+
+    # turn off unused axes
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
+
+    plt.tight_layout()
+    plt.show()
 
 def print_unique_values(df):
     """
@@ -96,6 +153,54 @@ def plot_pairplot_with_hue(df, hue_col, title_prefix="Pairplot with distinction 
 
     sns.pairplot(df[numerical_columns + [hue_col]], hue=hue_col, corner=True)
     plt.suptitle(f"{title_prefix} {hue_col}", y=1.02)
+    plt.show()
+    
+def compute_mutual_info(df, target_column):
+    """
+    Computes mutual information scores between numerical features and the target column.
+
+    Parameters:
+        df (pd.DataFrame): Input DataFrame.
+        target_column (str): Name of the target variable (e.g., 'num').
+
+    Returns:
+        pd.DataFrame: Mutual information scores sorted descendingly.
+    """
+
+    df_numeric = df.select_dtypes(include=np.number)
+
+    # drop rows with any NaNs in numerical features
+    df_numeric = df_numeric.dropna()
+
+    # separate features and target
+    X = df_numeric.drop(columns=[target_column])
+    y = df_numeric[target_column]
+
+    # compute MI
+    mi_scores = mutual_info_classif(X, y, discrete_features='auto', random_state=0)
+
+    mi_df = pd.DataFrame({
+        'Feature': X.columns,
+        'Mutual Information': mi_scores
+    }).sort_values(by='Mutual Information', ascending=False).reset_index(drop=True)
+
+    return mi_df
+
+def plot_mutual_info(mi_df, figsize=(10, 6)):
+    """
+    Plots a barplot of mutual information scores.
+
+    Parameters:
+        mi_df (pd.DataFrame): Output of `compute_mutual_info`.
+        figsize (tuple): Size of the figure.
+    """
+    plt.figure(figsize=figsize)
+    sns.barplot(data=mi_df, x='Mutual Information', y='Feature', color=sns.color_palette('viridis')[3])
+    plt.title('Mutual Information Scores')
+    plt.xlabel('Score')
+    plt.ylabel('Feature')
+    plt.grid(True, axis='x', linestyle='--', alpha=0.3)
+    plt.tight_layout()
     plt.show()
     
 def plot_class_distribution(df, target_columns, cols=3, figsize_per_plot=(5, 4)):
