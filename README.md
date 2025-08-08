@@ -46,7 +46,7 @@ pip install -r requirements.txt
 
 ## 📘 Usage
 
-- Use `notebooks/eda.ipynb` to perform inital EDA, cleaning and post-cleaning EDA.
+- Use `notebooks/eda.ipynb` to perform inital cleaning, EDA and preprocessing.
 
 ## 🧠 Models Used
 

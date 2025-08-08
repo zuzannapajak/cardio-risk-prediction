@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import math
 import pandas as pd
 import seaborn as sns
+import pathlib
+import os
 from sklearn.feature_selection import mutual_info_classif
 
 def create_plot_grid(n_plots, cols=3, figsize_per_plot=(5, 4)):
@@ -299,3 +301,22 @@ def plot_class_distribution(df, cols=3, figsize_per_plot=(5, 4), max_unique_valu
 
     plt.tight_layout()
     plt.show()
+    
+def create_data_dictionary(df: pd.DataFrame, save_path: str = "../outputs/data_dictionary/dictionary.csv") -> pd.DataFrame:
+    """
+    Creates a compact table of dataset columns with dtype, % missing, and unique counts,
+    and saves it to CSV.
+    """
+    save_path = pathlib.Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data_dict = pd.DataFrame({
+        "Column": df.columns,
+        "Data Type": df.dtypes.astype(str),
+        "% Missing": (df.isnull().mean() * 100).round(4),
+        "Unique Values": df.nunique()
+    }).sort_values(by="Column").reset_index(drop=True)
+
+    data_dict.to_csv(os.fspath(save_path), index=False)
+    print(f"Data dictionary saved to: {save_path}")
+    return data_dict

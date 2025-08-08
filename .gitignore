@@ -29,6 +29,7 @@ outputs/*.png
 outputs/*.jpg
 outputs/*.svg
 outputs/*.pdf
+outputs/data_dictionary
 
 # System files
 .DS_Store
