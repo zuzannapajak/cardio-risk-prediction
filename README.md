@@ -17,7 +17,10 @@ cardio-risk-prediction/
 
 ## 📊 Dataset
 
-The dataset used is related to cardiovascular health, including clinical and lifestyle-related features.
+The dataset used in this project is the **Heart Disease Dataset**, originally compiled by the authors of the Cleveland, Hungary, Switzerland, and VA Long Beach heart disease studies.  
+It was obtained from [Kaggle – Heart Disease Dataset](https://www.kaggle.com/datasets/redwankarimsony/heart-disease-data/data).
+
+**License:** Data files © Original Authors (as stated on the Kaggle dataset page).  
 
 ## 🛠 Setup Instructions
 
@@ -43,9 +46,7 @@ pip install -r requirements.txt
 
 ## 📘 Usage
 
-- Use `notebooks/eda.ipynb` to perform EDA and visualization.
-- Run `scripts/preprocessing.py` to clean and prepare your dataset.
-- Run `scripts/training.py` to train and evaluate your models.
+- Use `notebooks/eda.ipynb` to perform inital EDA, cleaning and post-cleaning EDA.
 
 ## 🧠 Models Used
 
