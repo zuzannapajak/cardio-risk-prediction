@@ -156,72 +156,113 @@ def plot_pairplot_with_hue(
     plt.suptitle(f"{title_prefix} {hue_col}", y=1.02)
     plt.show()
 
-
-def plot_class_distribution(df, cols=3, figsize_per_plot=(5, 4), max_unique_values=20):
+def plot_class_distribution(
+    data,
+    columns=None,                # None => all columns; str => one column; list[str] => selected
+    grid_cols=3,                 # number of subplot columns in the grid
+    figsize_per_plot=(5, 4),
+    max_unique_values=20,        # threshold to treat as categorical
+    bins=30                      # bins for numeric histograms
+):
     """
-    Plots multiple class distributions in a grid layout.
-
-    Parameters:
-    - df: pandas DataFrame containing the data.
-    - cols: number of columns in the grid.
-    - figsize_per_plot: size of each subplot
-    - max_unique_values: maximum number of unique values to consider a column as categorical.
+    Plots distributions for selected columns (or all if not provided).
+    - Categorical-like columns (dtype object/category or <= max_unique_values unique): bar plot of counts.
+    - Numeric-like columns: histogram.
+    
+    Parameters
+    ----------
+    data : pd.DataFrame | pd.Series | array-like
+    columns : None | str | list[str]
+        Columns to plot. If None, all columns are plotted.
+    grid_cols : int
+        Number of columns in the subplot grid.
+    figsize_per_plot : (w, h)
+        Size of each subplot.
+    max_unique_values : int
+        Max unique values to consider a column categorical.
+    bins : int
+        Number of bins for numeric histograms.
     """
 
-    # Automatically select categorical columns (object, category, or with few unique values)
-    categorical_cols = [
-        col for col in df.columns
-        if df[col].dtype in ['object', 'category'] or df[col].nunique() <= max_unique_values
-    ]
+    # input to DataFrame
+    if isinstance(data, pd.Series):
+        df = pd.DataFrame({data.name if data.name else 'value': data})
+    elif isinstance(data, (list, tuple, np.ndarray)):
+        df = pd.DataFrame({'value': data})
+    elif isinstance(data, pd.DataFrame):
+        df = data.copy()
+    else:
+        df = pd.DataFrame(data)
 
-    if not categorical_cols:
-        print("No categorical columns found to plot.")
+    # columns to plot
+    if columns is None:
+        cols_to_plot = list(df.columns)
+    elif isinstance(columns, str):
+        if columns not in df.columns:
+            raise KeyError(f"Column '{columns}' not found in data.")
+        cols_to_plot = [columns]
+    else:
+        missing = [c for c in columns if c not in df.columns]
+        if missing:
+            raise KeyError(f"Columns not found: {missing}")
+        cols_to_plot = list(columns)
+
+    if len(cols_to_plot) == 0:
+        print("No columns to plot.")
         return
 
-    n_plots = len(categorical_cols)
-    fig, axes = create_plot_grid(n_plots, cols=cols, figsize_per_plot=figsize_per_plot)
+    # grid
+    n_plots = len(cols_to_plot)
+    grid_rows = math.ceil(n_plots / grid_cols)
+    fig_width = figsize_per_plot[0] * grid_cols
+    fig_height = figsize_per_plot[1] * grid_rows
+    fig, axes = plt.subplots(grid_rows, grid_cols, figsize=(fig_width, fig_height))
+    axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
 
-    for i, col in enumerate(categorical_cols):
+    # plot each column
+    for i, col in enumerate(cols_to_plot):
         ax = axes[i]
-        
-        class_counts = df[col].value_counts()
-        class_counts.index = class_counts.index.astype(str)
-        class_counts = class_counts.sort_index()
-        
-        class_percentages = df[col].value_counts(normalize=True) * 100
-        class_percentages.index = class_percentages.index.astype(str)
-        class_percentages = class_percentages.sort_index()
-        
-        summary_df = pd.DataFrame({
-            'Class': class_counts.index.astype(str),
-            'Instances': class_counts.values,
-            'Percentage': class_percentages.values
-        })
+        s = df[col].dropna()
 
-        print(f"\n{'='*60}\nClass Distribution Summary for '{col}':")
-        print(summary_df.to_markdown(index=False, floatfmt=".2f"))
-
-        sns.barplot(
-            x=class_counts.index.astype(str),
-            y=class_counts.values,
-            ax=ax,
-            hue=class_counts.index.astype(str),
-            palette='viridis',
-            legend=False
+        is_categorical = (
+            s.dtype.name in ['object', 'category', 'bool']
+            or s.nunique(dropna=True) <= max_unique_values
         )
-        ax.set_title(f'{col}', fontsize=12)
-        ax.set_xlabel('Class')
-        ax.set_ylabel('Instances')
+
+        if is_categorical:
+            counts = s.astype(str).value_counts().sort_index()
+            perc = s.astype(str).value_counts(normalize=True).sort_index() * 100
+
+            summary_df = pd.DataFrame({
+                'Class': counts.index,
+                'Instances': counts.values,
+                'Percentage': np.round(perc.values, 2)
+            })
+            print(f"\n{'='*60}\nDistribution summary for '{col}':")
+            print(summary_df.to_markdown(index=False, floatfmt=".2f"))
+
+            sns.barplot(x=counts.index, y=counts.values, ax=ax, hue=counts.index, palette='viridis', legend=False)
+            ax.set_ylabel('Instances')
+            ax.set_xlabel('Class')
+
+        else:
+            desc = s.describe()[['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']]
+            print(f"\n{'='*60}\nNumeric summary for '{col}':")
+            print(desc.to_frame(name=col).to_markdown(floatfmt=".3f"))
+
+            sns.histplot(s, bins=bins, ax=ax)
+            ax.set_ylabel('Frequency')
+            ax.set_xlabel(col)
+
+        ax.set_title(str(col), fontsize=12)
         ax.grid(axis='y', linestyle='--', alpha=0.7)
 
-    # Hide unused axes
     for j in range(n_plots, len(axes)):
         axes[j].set_visible(False)
 
     plt.tight_layout()
     plt.show()
-
-
+    
 def plot_mutual_info(mi_df: pd.DataFrame, figsize: Tuple[float, float] = (10, 6)) -> None:
     """
     Horizontal barplot for mutual information scores (expects columns: Feature, Mutual Information).
