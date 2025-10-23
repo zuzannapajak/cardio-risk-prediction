@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import List, Optional, Tuple, Union
 import math
 import numpy as np
 import pandas as pd
@@ -26,7 +26,6 @@ def create_plot_grid(n_plots: int, cols: int = 3, figsize_per_plot: Tuple[float,
     else:
         axes = np.array([axes])
     return fig, axes
-
 
 # Plots
 
@@ -60,7 +59,6 @@ def plot_index_vs_columns(df: pd.DataFrame, cols: int = 3, figsize_per_plot: Tup
     plt.tight_layout()
     plt.show()
 
-
 def plot_violins(df: pd.DataFrame, cols: int = 3, figsize_per_plot: Tuple[float, float] = (5, 4)) -> None:
     """
     Violin plots for all numeric columns.
@@ -90,6 +88,72 @@ def plot_violins(df: pd.DataFrame, cols: int = 3, figsize_per_plot: Tuple[float,
     plt.tight_layout()
     plt.show()
 
+def plot_violins_binary(
+    df: pd.DataFrame,
+    binary_cols: List[str],
+    cols: int = 6,
+    figsize_per_plot: Tuple[float, float] = (5, 4),
+    numeric_cols: Optional[List[str]] = None,
+    dropna: bool = True,
+) -> None:
+    """
+    For each numeric column (target on y), plot violins grouped by each binary column (x).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    binary_cols : list[str]
+        Binary columns used on the x-axis (e.g., 0/1).
+    cols : int
+        Number of columns in each subplot grid.
+    figsize_per_plot : (float, float)
+        Size of each subplot.
+    numeric_cols : list[str] | None
+        Numeric columns to use as targets. If None, auto-detect numeric cols excluding `binary_cols`.
+    dropna : bool
+        Drop rows with NA in (target, feature) before plotting.
+    """
+    # choose numeric targets
+    if numeric_cols is None:
+        numeric_cols = [
+            c for c in df.select_dtypes(include='number').columns
+            if c not in set(binary_cols)
+        ]
+    if not numeric_cols or not binary_cols:
+        return
+
+    # one figure per numeric target, grid over all binaries
+    for target in numeric_cols:
+        n_plots = len(binary_cols)
+        fig, axes = create_plot_grid(n_plots, cols, figsize_per_plot)
+
+        for i, feat in enumerate(binary_cols):
+            ax = axes[i]
+            sub = df[[target, feat]]
+            if dropna:
+                sub = sub.dropna()
+
+            # Ensure x shows 0 → 1 when possible
+            x_order = [0, 1]
+            uniq = sorted(pd.unique(sub[feat]))
+            if set(uniq) != set(x_order):
+                x_order = uniq
+
+            sub = sub.copy()
+            sub[feat] = pd.Categorical(sub[feat], categories=x_order, ordered=True)
+            
+            sns.violinplot(data=sub, x=feat, y=target, inner='box', linewidth=1, ax=ax)
+            ax.set_title(f"{target} | {feat}")
+            ax.set_xlabel(feat)
+            ax.set_ylabel(target)
+            ax.grid(True, axis="y", linestyle="--", alpha=0.3)
+
+        # hide any unused axes
+        for j in range(n_plots, len(axes)):
+            axes[j].axis('off')
+
+        plt.tight_layout()
+        plt.show()
 
 def plot_histograms_with_kde(
     df: pd.DataFrame,
@@ -127,34 +191,102 @@ def plot_histograms_with_kde(
     plt.suptitle("Histograms with KDE for Numerical Features", y=1.02, fontsize=14)
     plt.show()
 
+def plot_correlation_heatmap(
+    df: pd.DataFrame,
+    cols: None,
+    figsize: Tuple[int, int] = (10, 8),
+    annot: bool = True,
+    title: str = 'Correlation Matrix Heatmap',
+) -> None:
+    """
+    Plot a correlation matrix heatmap for selected (or all numeric) columns.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame containing the data.
+    cols can be:
+      - list/Index/ndarray of column names,
+      - boolean mask (Series/ndarray) aligned to df.columns,
+      - DataFrame (uses its columns).
+    figsize : (int, int)
+        Figure size in inches (width, height).
+    annot : bool
+        Whether to show correlation values inside the heatmap.
+    title : str
+        Title of the heatmap.
+    """
+    if cols is None:
+        data = df.select_dtypes(include='number')
+    else:
+           if isinstance(cols, pd.DataFrame):
+            cols = cols.columns
+
+            # Boolean mask case
+            if isinstance(cols, (pd.Series, np.ndarray)) and getattr(cols, 'dtype', None) == bool:
+                data = df.loc[:, cols]
+            else:
+                # Treat as column-name iterable
+                cols = list(cols)
+                # intersect with df.columns to avoid KeyError
+                cols = [c for c in cols if c in df.columns]
+                if not cols:
+                    raise ValueError("No valid columns found in `cols`.")
+                data = df.loc[:, cols]
+
+            # Keep only numeric
+            data = data.select_dtypes(include='number')
+
+    if data.shape[1] == 0:
+        raise ValueError("No numeric columns available for correlation after filtering.")
+
+    corr = data.corr(numeric_only=True)
+
+    plt.figure(figsize=figsize)
+    sns.heatmap(corr, annot=annot, linewidths=0.5, fmt='.2f', cmap='coolwarm')
+    plt.title(title)
+    plt.show()
 
 def plot_pairplot_with_hue(
     df: pd.DataFrame,
-    hue_col: str,
+    hue_cols: list[str] | str,
     title_prefix: str = "Pairplot with distinction for",
     sample: int | None = None,
 ) -> None:
     """
-    Pairplot for numeric columns colored by `hue_col`. Optionally subsample for speed.
+    Generate Seaborn pairplots for numeric columns colored by one or multiple hue columns.
 
     Parameters:
-        - df (pd.DataFrame): DataFrame containing the dataset.
-        - hue_col (str): Name of the binary column to distinguish in the plot (e.g., 'anaemia').
-        - title_prefix (str): Optional prefix for the plot title.
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the dataset.
+    hue_cols : list[str] | str
+        Column name or list of binary columns to distinguish in the plots (e.g., ['anaemia', 'diabetes']).
+    title_prefix : str
+        Optional prefix for the plot title.
+    sample : int | None
+        Optional subsample size for faster plotting.
     """
+
     data = df.copy()
-    if sample is not None and len(data) > sample:
-        data = data.sample(n=sample, random_state=0)
+    numeric_cols = data.select_dtypes(include=np.number).columns.tolist()
 
-    if hue_col in data.columns:
-        data[hue_col] = data[hue_col].astype('category')
+    # Count unique non-null values per numeric column
+    nunq = {c: data[c].dropna().nunique() for c in numeric_cols}
+    nonbinary_vars = [c for c in numeric_cols if nunq[c] > 2]
 
-    num_cols = data.select_dtypes(include=np.number).columns.tolist()
-    g = sns.pairplot(data[num_cols + [hue_col]] if hue_col in data else data[num_cols],
-                     hue=hue_col if hue_col in data else None,
-                     corner=True)
-    plt.suptitle(f"{title_prefix} {hue_col}", y=1.02)
-    plt.show()
+    for hue_col in hue_cols:
+        if hue_col not in data.columns:
+            print(f"Skipping '{hue_col}' — not in DataFrame.")
+            continue
+
+        vars_for_plot = [c for c in nonbinary_vars if c != hue_col]
+        sub = data[vars_for_plot + [hue_col]].copy()
+        sub[hue_col] = sub[hue_col].astype("category")
+
+        g = sns.pairplot(sub, vars=vars_for_plot, hue=hue_col, corner=True, diag_kind="kde", dropna=True)
+        plt.suptitle(f"{title_prefix} {hue_col}", y=1.02)
+        plt.show()
 
 def plot_class_distribution(
     data,

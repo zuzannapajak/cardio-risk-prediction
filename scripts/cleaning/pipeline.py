@@ -1,41 +1,52 @@
-import pandas as pd
+import numpy as np
 from sklearn.pipeline import Pipeline
-from scripts.cleaning.transformers import (
-    DropColumns,
-    InvalidValueToNaN,
-    DropHighNullColumns,
-    OutlierCapper,
-    RandomNormalImputer,
-    CategoricalMissingCategoryImputer
-)
+from scripts.cleaning.transformers import (ConvertToNumeric, InvalidValueToNaN, BoundsToNaN, EnsureBinaryInt)
 
-def build_cleaning_pipeline(null_threshold: float = 0.40) -> Pipeline:
+def build_cleaning_pipeline() -> Pipeline:
     """
-    1) Drop id column
-    2) Drop high-null columns
-    3) Invalid -> NaN (rule-based)
-    4) Impute numerics (random normal around mean/std)
-    5) Impute categoricals (add 'Missing')
-    6) Cap numeric outliers with IQR method
+    Heart-failure dataset cleaning pipeline (model-agnostic).
+
+        Steps:
+            1) Convert selected columns to numeric (coerce errors)
+            2) Replace invalid or out-of-range values with NaN
+            3) Enforce binary columns to contain only {0, 1} integers
+
+        Purpose:
+            - Ensure correct datatypes and valid ranges before analysis.
+            - This stage performs deterministic, rule-based cleaning
+              and does NOT learn from the data (no leakage risk).
+            - Suitable for full dataset cleaning and EDA.
     """
-    steps = []
 
-    # 1) Drop id column
-    steps.append(("drop_id", DropColumns(columns=["id"])))
+    # column groups
+    numeric_cols = ["age", "creatinine_phosphokinase", "ejection_fraction", "platelets", "serum_creatinine", "serum_sodium", "time"]
+    binary_cols = ["anaemia", "diabetes", "high_blood_pressure", "sex", "smoking", "DEATH_EVENT"]
+    all_cols = numeric_cols + binary_cols
 
-    # 2) Drop high-null columns
-    steps.append(("drop_high_nulls", DropHighNullColumns(threshold= null_threshold)))
+    # physiologic plausibility bounds
+    bounds = {
+        "age": (18, 120),
+        "ejection_fraction": (10, 85),
+        "platelets": (20_000, 1_000_000),
+        "serum_creatinine": (0.2, 15),
+        "serum_sodium": (110, 160),
+        "creatinine_phosphokinase": (0, 10_000),
+        "time": (0, np.inf)
+    }
 
-    # 3) Convert invalid values to NaN
-    steps.append(("invalid_to_nan", InvalidValueToNaN()))
+    # cleaning steps
+    steps = [
+        # convert selected columns to numeric and coerce invalid values
+        ("to_numeric", ConvertToNumeric(columns=all_cols)),
 
-    # 4) Impute numeric columns
-    steps.append(("impute_numeric", RandomNormalImputer(random_state=42)))
+        # replace general invalid placeholders (e.g., negatives, non-finite) with NaN
+        ("invalid_to_nan_generic", InvalidValueToNaN()),
 
-    # 5) Impute categorical columns with 'Missing'
-    steps.append(("impute_categorical", CategoricalMissingCategoryImputer(fill_value="Missing")))
+        # replace values falling outside physiologic bounds with NaN
+        ("invalid_to_nan_bounds", BoundsToNaN(bounds=bounds)),
 
-    # 6) Cap numeric outliers via IQR
-    steps.append(("cap_outliers", OutlierCapper()))
+        # enforce all binary columns to be valid {0, 1} integers
+        ("enforce_binary", EnsureBinaryInt(columns=binary_cols)),
+    ]
 
     return Pipeline(steps=steps)

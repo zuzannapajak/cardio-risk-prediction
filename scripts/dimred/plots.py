@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.colors import qualitative
 
 
 def plot_cumulative_variance(explained_variance, show_target: float | None = 0.95):
@@ -39,7 +41,7 @@ def plot_cumulative_variance(explained_variance, show_target: float | None = 0.9
     plt.show()
     
     
-def plot_3d(
+def plot(
     X3d: pd.DataFrame | np.ndarray,
     y: pd.Series | np.ndarray,
     algorithm: str = "PCA",
@@ -118,3 +120,113 @@ def plot_3d(
 
         plt.tight_layout()
         plt.show()
+        
+    
+def plot_3d(
+    X3d: pd.DataFrame | np.ndarray,
+    y: pd.Series | np.ndarray,
+    algorithm: str = "PCA",
+    target_name: str = "num",
+    angles: tuple[tuple[int, int], ...] = ((30, 45), (60, 120), (0, 180)),
+    s: int = 5,
+    alpha: float = 0.8,
+    height: int = 650,
+    width: int = 800,
+    show: bool = False,
+):
+    """
+    Interactive 3D scatter (Plotly) for dimensionality reduction results.
+
+    Features:
+    - One interactive plot (no repeated plots per angle)
+    - Clickable legend for each class
+    - Hover tooltips showing coordinates and class
+    - Optional dropdown to switch to predefined camera angles
+    """
+
+    # --- Prepare inputs
+    X = X3d.values if isinstance(X3d, pd.DataFrame) else np.asarray(X3d)
+    if X.ndim != 2 or X.shape[1] != 3:
+        raise ValueError("X3d must have shape (n_samples, 3).")
+
+    if isinstance(X3d, pd.DataFrame):
+        labels_xyz = list(X3d.columns)
+    else:
+        labels_xyz = ["Component 1", "Component 2", "Component 3"]
+
+    y = pd.Series(y).reset_index(drop=True)
+    classes = pd.Index(sorted(y.unique(), key=lambda v: str(v)))
+
+    # Use a qualitative palette for distinct class colors
+    palette = qualitative.Plotly + qualitative.D3 + qualitative.Light24
+    if len(classes) > len(palette):
+        palette = (palette * ((len(classes) // len(palette)) + 1))[: len(classes)]
+
+    # --- Create the interactive 3D scatter
+    fig = go.Figure()
+
+    for i, c in enumerate(classes):
+        mask = (y == c).to_numpy()
+        fig.add_trace(
+            go.Scatter3d(
+                x=X[mask, 0],
+                y=X[mask, 1],
+                z=X[mask, 2],
+                mode="markers",
+                name=str(c),
+                marker=dict(size=s, opacity=alpha, color=palette[i], line=dict(width=0)),
+                hovertemplate=(
+                    f"<b>{target_name}</b>: {str(c)}<br>"
+                    f"{labels_xyz[0]}: %{{x:.3f}}<br>"
+                    f"{labels_xyz[1]}: %{{y:.3f}}<br>"
+                    f"{labels_xyz[2]}: %{{z:.3f}}<extra></extra>"
+                ),
+            )
+        )
+
+    # --- Helper to convert (elev, azim) → Plotly camera eye vector
+    def eye_from_elev_azim(elev_deg: float, azim_deg: float, r: float = 2.2):
+        elev, azim = np.deg2rad(elev_deg), np.deg2rad(azim_deg)
+        x = r * np.cos(elev) * np.cos(azim)
+        y = r * np.cos(elev) * np.sin(azim)
+        z = r * np.sin(elev)
+        return dict(x=x, y=y, z=z)
+
+    # --- Dropdown for camera angle presets
+    buttons = [
+        dict(
+            label=f"View {i+1} (elev={e}, azim={a})",
+            method="relayout",
+            args=[{"scene.camera": {"eye": eye_from_elev_azim(e, a)}}],
+        )
+        for i, (e, a) in enumerate(angles)
+    ]
+
+    fig.update_layout(
+        title=f"3D {algorithm} colored by {target_name}",
+        width=width,
+        height=height,
+        scene=dict(
+            xaxis_title=labels_xyz[0],
+            yaxis_title=labels_xyz[1],
+            zaxis_title=labels_xyz[2],
+            camera=dict(eye=eye_from_elev_azim(*angles[0])),
+        ),
+        legend=dict(itemsizing="trace"),
+        margin=dict(l=0, r=0, t=60, b=0),
+        updatemenus=[
+            dict(
+                type="dropdown",
+                buttons=buttons,
+                x=0.01,
+                y=1.08,
+                xanchor="left",
+                yanchor="top",
+                showactive=True,
+            )
+        ],
+    )
+
+    if show:
+        fig.show()
+    return fig

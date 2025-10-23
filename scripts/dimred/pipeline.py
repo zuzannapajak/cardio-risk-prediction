@@ -1,55 +1,49 @@
-from typing import List
-import pandas as pd
-from sklearn.pipeline import Pipeline
-
+from enum import auto
+from imblearn.pipeline import Pipeline as ImbPipeline
+from imblearn.combine import SMOTEENN
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import EditedNearestNeighbours
 from scripts.preprocessing.transformers import (
-    FixedMappingEncoderTransformer,
-    LabelEncoderTransformer,
-    ScalingTransformer,
+    RandomNormalImputer, OutlierCapper, SafeLog1p, ScalingTransformer
 )
 
-def build_dimred_preprocessing_pipeline() -> Pipeline:
+def build_preprocessing_pipeline() -> ImbPipeline:
     """
-    Preprocessing tailored for dimensionality reduction:
-      - sex: Label map Female=0, Male=1 (else -1)
-      - fbs: Label map False=0, True=1, Missing=2
-      - exang: Label map False=0, True=1, Missing=2
-      - dataset, cp, restecg, slope: Label-encoded (stable order)
-      - age, trestbps, chol, thalch, oldpeak: StandardScaler (z-score)
-      - num: target — untouched
+    Heart-failure dataset preprocessing pipeline (model-dependent).
+
+        Steps:
+            1) Impute numeric NaNs
+            2) Cap outliers (IQR)
+            3) Log1p skewed vars
+            4) Min–max scale numeric (before SMOTE)
+            5) SMOTE resampling (runs ONLY on fit_resample)
+
+        Purpose:
+            - Learn data-driven parameters from the training fold only
+              (mean/std for imputation, scaling bounds, outlier thresholds).
+            - Prepare data for modeling and resampling while avoiding leakage.
+            - Apply identical transformations to the test set via `transform()`.
     """
-    steps = []
+    
+    # column groups
+    skew_cols = ["creatinine_phosphokinase", "serum_creatinine", "platelets"]
+    numeric_cols = ["age", "creatinine_phosphokinase", "ejection_fraction", "platelets", "serum_creatinine", "serum_sodium", "time"]
+    numeric_to_scale = ["age", "ejection_fraction", "serum_sodium", "serum_creatinine", "time"]
 
-    # 1) Fixed mappings for simple binary flags
-    steps.append((
-        "fixed_encoders",
-        FixedMappingEncoderTransformer(
-            mapping={
-                "sex":   {"Female": 0, "Male": 1},
-                "fbs":   {"False": 0, "True": 1, "Missing": 2},
-                "exang": {"False": 0, "True": 1, "Missing": 2},
-            },
-            fallback_value=-1
-        )
-    ))
+    # preprocessing steps
+    steps = [
+        # fill NaN with synthetic random-normal values around the mean/std
+        ("impute_numeric", RandomNormalImputer(random_state=42)),
+        
+        # cap extreme outliers based on IQR thresholds
+        ("cap_outliers", OutlierCapper(columns=numeric_cols, method="iqr", factor=1.5)),
 
-    # 2) Label-encode nominal columns (categorical → integer codes)
-    steps.append((
-        "label_encoders",
-        LabelEncoderTransformer(
-            columns=["dataset", "cp", "restecg", "slope"]
-        )
-    ))
+        # reduce skewness for heavily right-tailed variables
+        ("log_skewed", SafeLog1p(columns=skew_cols)),
 
-    # 3) Scale numeric columns (z-score)
-    steps.append((
-        "zscore_scaling",
-        ScalingTransformer(
-            columns=["age", "trestbps", "chol", "thalch", "oldpeak"],
-            strategy="zscore"
-        )
-    ))
+        # normalize features to [0, 1] range (important before SMOTE)
+        ("scale_numeric", ScalingTransformer(columns=numeric_to_scale, strategy="minmax")),
 
-    # Note: 'num' (target variable) remains unchanged and is excluded.
+    ]
 
-    return Pipeline(steps=steps)
+    return ImbPipeline(steps=steps)
