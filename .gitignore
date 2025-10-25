@@ -15,7 +15,6 @@ venv/
 .vscode/
 
 # Data and model outputs (optional, keep raw data elsewhere)
-data/*.csv
 data/*.xlsx
 data/*.json
 *.h5
@@ -24,12 +23,11 @@ data/*.json
 *.joblib
 
 # Plot images and results
-outputs/figures/
+outputs/
 outputs/*.png
 outputs/*.jpg
 outputs/*.svg
 outputs/*.pdf
-outputs/data_dictionary
 
 # System files
 .DS_Store

@@ -1,13 +1,9 @@
-def evaluate_classification(model, X_test, y_test, threshold: float = 0.5):
-    import numpy as np, pandas as pd
-    from IPython.display import display
-    from sklearn.metrics import (
-        accuracy_score, balanced_accuracy_score, precision_score, recall_score,
-        roc_auc_score, average_precision_score, log_loss, jaccard_score,
-        hamming_loss, f1_score, fbeta_score, matthews_corrcoef, cohen_kappa_score,
-        zero_one_loss, confusion_matrix, brier_score_loss
-    )
+import numpy as np, pandas as pd
+from IPython.display import display
+from sklearn.metrics import (accuracy_score, balanced_accuracy_score, precision_score, recall_score,roc_auc_score, average_precision_score, brier_score_loss,
+    log_loss, jaccard_score, hamming_loss, f1_score, fbeta_score, matthews_corrcoef, cohen_kappa_score,zero_one_loss, confusion_matrix)
 
+def evaluate_classification(model, X_test, y_test, threshold: float = 0.5):
     y_true = np.asarray(y_test)
 
     # scores/proba

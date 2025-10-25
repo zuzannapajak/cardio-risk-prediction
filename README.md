@@ -17,8 +17,8 @@ cardio-risk-prediction/
 
 ## 📊 Dataset
 
-The dataset used in this project is the **Heart Disease Dataset**, originally compiled by the authors of the Cleveland, Hungary, Switzerland, and VA Long Beach heart disease studies.  
-It was obtained from [Kaggle – Heart Disease Dataset](https://www.kaggle.com/datasets/redwankarimsony/heart-disease-data/data).
+This project uses the **Heart Failure Clinical Records** dataset from Kaggle.
+Download it from: [Kaggle – Heart Failure Dataset]https://www.kaggle.com/datasets/andrewmvd/heart-failure-clinical-data
 
 **License:** Data files © Original Authors (as stated on the Kaggle dataset page).  
 

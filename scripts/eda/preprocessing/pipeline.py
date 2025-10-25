@@ -44,19 +44,12 @@ def build_preprocessing_pipeline() -> ImbPipeline:
         # normalize features to [0, 1] range (important before SMOTE)
         ("scale_numeric", ScalingTransformer(columns=numeric_to_scale, strategy="minmax")),
 
-        # combine SMOTE oversampling
-        # OPTION 1
-        # ("smote", SMOTE(sampling_strategy=1.0, k_neighbors=5, random_state=42)),
-        
-        # OPTION 2
+        # combine SMOTEEN oversampling
         ("balance", SMOTEENN(
             sampling_strategy="auto",
             smote=SMOTE(k_neighbors=3, random_state=42),
             enn=EditedNearestNeighbours(n_neighbors=3)
         )),
-        
-        # OPTION 3
-        # ("balance", SMOTEENN(random_state=42))
     ]
 
     return ImbPipeline(steps=steps)
