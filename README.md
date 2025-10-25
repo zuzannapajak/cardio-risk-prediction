@@ -18,7 +18,7 @@ cardio-risk-prediction/
 ## 📊 Dataset
 
 This project uses the **Heart Failure Clinical Records** dataset from Kaggle.
-Download it from: [Kaggle – Heart Failure Dataset]https://www.kaggle.com/datasets/andrewmvd/heart-failure-clinical-data
+Download it from: [Kaggle – Heart Failure Dataset](https://www.kaggle.com/datasets/andrewmvd/heart-failure-clinical-data)
 
 **License:** Data files © Original Authors (as stated on the Kaggle dataset page).  
 
