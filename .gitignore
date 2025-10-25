@@ -15,8 +15,11 @@ venv/
 .vscode/
 
 # Data and model outputs (optional, keep raw data elsewhere)
+data/
+data/*.csv
 data/*.xlsx
 data/*.json
+data/heart.csv
 *.h5
 *.npy
 *.pkl
