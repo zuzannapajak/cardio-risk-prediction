@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.pipeline import Pipeline
-from scripts.cleaning.transformers import (ConvertToNumeric, InvalidValueToNaN, BoundsToNaN, EnsureBinaryInt)
+from scripts.eda.cleaning.transformers import (ConvertToNumeric, InvalidValueToNaN, BoundsToNaN, EnsureBinaryInt)
 
 def build_cleaning_pipeline() -> Pipeline:
     """

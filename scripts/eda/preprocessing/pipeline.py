@@ -3,7 +3,7 @@ from imblearn.pipeline import Pipeline as ImbPipeline
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import EditedNearestNeighbours
-from scripts.preprocessing.transformers import (
+from scripts.eda.preprocessing.transformers import (
     RandomNormalImputer, OutlierCapper, SafeLog1p, ScalingTransformer
 )
 
