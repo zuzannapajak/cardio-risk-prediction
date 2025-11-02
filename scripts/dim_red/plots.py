@@ -237,6 +237,7 @@ def plot_3d(
     y: pd.Series | np.ndarray,
     algorithm: str = "PCA",
     target_name: str = "num",
+    data_name: str | None = None,
     angles: tuple[tuple[int, int], ...] = ((30, 45), (60, 120), (0, 180)),
     s: int = 5,
     alpha: float = 0.8,
@@ -332,6 +333,21 @@ def plot_3d(
         updatemenus=[dict(type="dropdown", buttons=buttons, x=0.01, y=1.08, xanchor="left", yanchor="top", showactive=True)],
         uirevision="keep_view",  # nie resetuj kamery po aktualizacjach
     )
+
+    if data_name:
+        fig.add_annotation(
+            text=f"<b>DATA:</b> {data_name.upper()}",
+            showarrow=False,
+            xref="paper", yref="paper",
+            x=1, y=1,
+            xanchor="right", yanchor="top",
+            font=dict(size=12, color="black"),
+            bgcolor="white",
+            bordercolor="black",
+            borderwidth=1,
+            borderpad=4,
+            opacity=0.8,
+        )
 
     if show:
         fig.show()

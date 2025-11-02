@@ -39,10 +39,11 @@ def rank_leaderboard(board):
     """Order candidates by your _score_internal (sil ↑, CH ↑, 1/(1+DB) ↑); tie-break: fewer clusters."""
     def key(row):
         m = row["metrics"]
-        k = (m.get("n_clusters") or (row["params"].get("k") if row.get("params") else None) or 0)
-        return (_score_internal(m), -int(k))
+        k = (m.get("n_clusters")
+             or (row["params"].get("k") if row.get("params") else None)
+             or 0)
+        return (_score_internal(m), -int(k))  # prefer fewer clusters on ties
     return sorted(board, key=key, reverse=True)
-
 
 def _safe_internal_scores(X, labels):
     """Compute internal metrics; return NaNs when invalid (e.g., 1 cluster)."""
