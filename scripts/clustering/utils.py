@@ -16,7 +16,7 @@ def build_global_leaderboard(datasets_map):
     """Collect (embedding × algo) candidates with metrics using your existing utilities."""
     board = []
     for emb, X in datasets_map.items():
-        km_best = gridsearch_kmeans_params(X, ks=range(2, 6), n_inits=(10, 20))["params"]
+        km_best = gridsearch_kmeans_params(X, ks=range(2, 6), n_inits=(10, 25))["params"]
         if km_best:
             km = build_model("kmeans", {"params": km_best, "n_clusters": km_best["k"]})
             lab = km.fit_predict(X)
@@ -78,7 +78,7 @@ def _pick_best(df_metrics):
         return None
     return g.sort_values("rank_sum").index[0]
 
-def gridsearch_kmeans_params(X, ks=range(2, 11), n_inits=(10,)):
+def gridsearch_kmeans_params(X, ks=range(2, 11), n_inits=(10,25)):
     rows = []
     for k in ks:
         for n_init in n_inits:
@@ -362,7 +362,7 @@ class SelectionResult:
     extra: Optional[Dict] = None     # e.g., linkage used, additional info
 
 
-def select_k_kmeans(X, k_range=range(2, 21), n_init=20, random_state=42, data_name: str | None = None) -> SelectionResult:
+def select_k_kmeans(X, k_range=range(2, 21), n_init=range(10,25), random_state=42, data_name: str | None = None) -> SelectionResult:
     rows = []
     for k in k_range:
         km = KMeans(n_clusters=k, n_init=n_init, random_state=random_state)
@@ -405,7 +405,6 @@ def select_k_agglomerative(X, k_range=range(2, 21), linkage: str = "ward", metri
 
 def build_model(algo: str, w: dict):
     p = w.get("params", {}) or {}
-    # unify "k"/"n_clusters"
     k = int(w.get("n_clusters", p.get("k", p.get("n_clusters", 2))))
 
     if algo == "dbscan":
@@ -424,17 +423,6 @@ def build_model(algo: str, w: dict):
         return AgglomerativeClustering(**kwargs)
 
     raise ValueError(f"Unknown algo: {algo}")
-
-
-def _score_combined_internal_external(metrics, labels, y_true):
-    s_int = _score_internal(metrics)  # (sil, CH, 1/(1+DB))
-    if y_true is None:
-        return s_int
-    ext = external_scores(labels, y_true)
-    ari = ext.get("ARI") or 0.0
-    nmi = ext.get("NMI") or 0.0
-    # small weights so internal stays primary
-    return (s_int[0], s_int[1], s_int[2], 0.1 * ari, 0.05 * nmi)
 
 def compute_smds(X: pd.DataFrame, labels: np.ndarray) -> pd.DataFrame:
     """
@@ -555,32 +543,26 @@ def plot_smd_heatmap(smd_df, top_n=8, title=None, abs_values=True):
     Heatmap-like plot showing SMDs for all clusters (rows = features, cols = clusters).
     Much more readable than grouped/stacked bars.
     """
-    # 1️⃣ pick union of top features across clusters
     top_feats = set()
     for c in smd_df.columns:
         top_feats |= set(smd_df[c].abs().nlargest(top_n).index)
     top_feats = sorted(top_feats)
 
-    # 2️⃣ reorder by overall |SMD|
     df_plot = smd_df.loc[top_feats].copy()
     if abs_values:
         df_plot = df_plot.abs()
     df_plot = df_plot.loc[df_plot.max(axis=1).sort_values(ascending=False).index]
 
-    # 3️⃣ plot as heatmap with annotations
     fig, ax = plt.subplots(figsize=(1.4 * len(df_plot.columns), 0.5 * len(df_plot)))
     im = ax.imshow(df_plot, cmap="coolwarm", aspect="auto")
 
-    # axes
     ax.set_xticks(np.arange(len(df_plot.columns)))
     ax.set_yticks(np.arange(len(df_plot.index)))
     ax.set_xticklabels(df_plot.columns, rotation=45, ha="right")
     ax.set_yticklabels(df_plot.index)
 
-    # colorbar
-    cbar = plt.colorbar(im, ax=ax, shrink=0.7, label="|Standardized Mean Difference|" if abs_values else "SMD")
+    plt.colorbar(im, ax=ax, shrink=0.7, label="|Standardized Mean Difference|" if abs_values else "SMD")
 
-    # annotation values
     for i in range(len(df_plot.index)):
         for j in range(len(df_plot.columns)):
             val = df_plot.iloc[i, j]
