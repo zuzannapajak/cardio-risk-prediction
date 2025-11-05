@@ -1,9 +1,10 @@
 import numpy as np, pandas as pd
 from IPython.display import display
+from sklearn.model_selection import cross_val_predict
 from sklearn.metrics import (accuracy_score, balanced_accuracy_score, precision_score, recall_score,roc_auc_score, average_precision_score, brier_score_loss,
     log_loss, jaccard_score, hamming_loss, f1_score, fbeta_score, matthews_corrcoef, cohen_kappa_score,zero_one_loss, confusion_matrix)
 
-def evaluate_classification(model, X_test, y_test, threshold: float = 0.5):
+def evaluate_classification(model, X_test, y_test, threshold: float = 0.5, show: bool = True):
     y_true = np.asarray(y_test)
 
     # scores/proba
@@ -44,17 +45,34 @@ def evaluate_classification(model, X_test, y_test, threshold: float = 0.5):
         "Negatives (TN+FP)": int(tn + fp),
     }
 
-    # >>> build a 2-column DataFrame and DISPLAY it (no manual styling)
-    df_metrics = pd.DataFrame(
-        {"Metric": list(metrics.keys()), "Value": np.round(list(metrics.values()), 4)}
-    )
-    display(df_metrics)
+    df_metrics = pd.DataFrame({
+        "Metric": list(metrics.keys()),
+        "Value": np.round(list(metrics.values()), 4)
+    })
 
-    # confusion matrix as a small DF
     cm_df = pd.DataFrame([[tn, fp], [fn, tp]],
                          index=["Actual 0", "Actual 1"],
                          columns=["Pred 0", "Pred 1"])
-    print("\nConfusion matrix:")
-    display(cm_df)
+
+    if show:
+        display(df_metrics)
+        print("\nConfusion matrix:")
+        display(cm_df)
 
     return df_metrics, {"cm": cm_df, "y_pred": y_pred, "y_score": y_score}
+
+def _oof_scores(model, X, y, cv):
+    if hasattr(model, "predict_proba"):
+        return cross_val_predict(model, X, y, cv=cv, method="predict_proba", n_jobs=-1)[:, 1]
+    elif hasattr(model, "decision_function"):
+        raw = cross_val_predict(model, X, y, cv=cv, method="decision_function", n_jobs=-1)
+        return (raw - raw.min()) / (raw.ptp() + 1e-12)
+    else:
+        return cross_val_predict(model, X, y, cv=cv, method="predict", n_jobs=-1).astype(float)
+
+def _score_metric(y_true, y_pred, metric):
+    m = metric.lower()
+    if m == "f1": return f1_score(y_true, y_pred, zero_division=0)
+    if m == "mcc": return matthews_corrcoef(y_true, y_pred)
+    if m in ("balanced accuracy", "balanced_accuracy", "ba"): return balanced_accuracy_score(y_true, y_pred)
+    raise ValueError("metric must be F1 | MCC | Balanced accuracy")
