@@ -67,15 +67,13 @@ def _safe_internal_scores(X, labels):
 def _pick_best(df_metrics):
     """Rank rows and return the best index."""
     g = df_metrics.copy()
-    # larger is better for sil & CH; smaller is better for DB
     g["r_sil"] = g["silhouette"].rank(ascending=False, method="min")
     g["r_ch"]  = g["calinski_harabasz"].rank(ascending=False, method="min")
     g["r_db"]  = g["davies_bouldin"].rank(ascending=True,  method="min")
     g["rank_sum"] = g[["r_sil","r_ch","r_db"]].sum(axis=1)
-    # If all three are NaN for some rows, rank() yields NaN; drop them
+
     g = g.dropna(subset=["rank_sum"])
-    if g.empty:
-        return None
+    if g.empty: return None
     return g.sort_values("rank_sum").index[0]
 
 def gridsearch_kmeans_params(X, ks=range(2, 11), n_inits=(10,25)):
@@ -115,15 +113,6 @@ def gridsearch_agglomerative_params(
         return {"params": None}
     best = df.loc[idx]
     return {"params": {"k": int(best["k"]), "linkage": best["linkage"], "metric": best["metric"]}}
-
-def cluster_and_reduce(X, clusterer, reducer, name_cluster, name_reducer):
-    labels = clusterer.fit_predict(X)
-    df = pd.concat([pd.DataFrame(X, columns=X.columns), pd.Series(labels, name='Cluster')], axis=1)
-    X_red = reducer.fit_transform(df.iloc[:, :-1])
-    df_red = pd.DataFrame(X_red, columns=[f"{name_reducer}_{i+1}" for i in range(X_red.shape[1])])
-    df_red["Cluster"] = labels
-    plot_3d(X_red, labels, algorithm=f"{name_cluster} + {name_reducer}", target_name="Cluster")
-    return df_red, labels
 
 
 def internal_scores(X: np.ndarray, labels: np.ndarray) -> Dict[str, Optional[float]]:
@@ -259,42 +248,9 @@ def plot_clusters_target_3d(X, cluster_labels, y_target, title="3D Clusters vs D
         legend=dict(bgcolor="white", bordercolor="lightgray", borderwidth=1),
         height=700,
         width=900,
-        template="plotly_white",
     )
 
     fig.show()
-
-
-def reduce_3d_and_plot(X, labels, algo_name: str):
-    # PCA
-    pca = PCA(n_components=3)
-    X_pca3 = pca.fit_transform(X)
-    print(f"[{algo_name}] PCA explained variance ratio:", pca.explained_variance_ratio_)
-    fig_pca = plot_3d(X_pca3, labels, algorithm=f"PCA colored by {algo_name}", target_name="cluster")
-    fig_pca.show()
-
-    # UMAP
-    reducer = umap.UMAP(n_components=3)
-    X_umap3 = reducer.fit_transform(X)
-    fig_umap = plot_3d(X_umap3, labels, algorithm=f"UMAP colored by {algo_name}", target_name="cluster")
-    fig_umap.show()
-
-    # t-SNE (pilnuj perplexity)
-    n = X.shape[0]
-    max_perp = max(5, min(30, (n - 1) // 3 - 1))  # bezpiecznie dla mniejszych próbek
-    tsne = TSNE(n_components=3, perplexity=max_perp, init="pca")
-    X_tsne3 = tsne.fit_transform(X)
-    fig_tsne = plot_3d(X_tsne3, labels, algorithm=f"t-SNE colored by {algo_name}", target_name="cluster")
-    fig_tsne.show()
-
-def cluster_vs_target(labels, y):
-    tab = pd.crosstab(pd.Series(labels, name="Cluster"), pd.Series(y, name="DEATH_EVENT"))
-    tab["Count"] = tab.sum(axis=1)
-    if 1 in tab.columns:
-        tab["Death_%"] = (tab[1] / tab["Count"] * 100).round(1)
-    else:
-        tab["Death_%"] = 0.0
-    return tab
 
 
 def cluster_profile(df_original: pd.DataFrame, labels: np.ndarray, top_n: int = 8):
