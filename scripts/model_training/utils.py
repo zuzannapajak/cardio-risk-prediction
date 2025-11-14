@@ -153,7 +153,7 @@ def find_best_threshold(
             return matthews_corrcoef(y_true, y_pred)
         if metric == "balanced_accuracy":
             return balanced_accuracy_score(y_true, y_pred)
-        return f1_score(y_true, y_pred, zero_division=0)    # default
+        return f1_score(y_true, y_pred, zero_division=0)
 
     scores = np.array([score_at(t) for t in candidates])
     i = int(np.nanargmax(scores))

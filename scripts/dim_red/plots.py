@@ -53,7 +53,7 @@ def plot_3d(
     y: pd.Series | np.ndarray,
     *,
     algorithm: str = "PCA",
-    target_name: str = "num",
+    target_name: str = "DEATH_EVENT",
     data_name: str | None = None,
     marker_size: int = 5,
     marker_opacity: float = 0.8,
