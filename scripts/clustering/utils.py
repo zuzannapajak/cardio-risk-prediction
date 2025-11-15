@@ -1,5 +1,5 @@
 import umap, numpy as np
-import pandas as pd
+import pandas as pd, seaborn as sns
 
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -13,27 +13,69 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 
 def build_global_leaderboard(datasets_map):
-    """Collect (embedding × algo) candidates with metrics using your existing utilities."""
+    """
+    Collect (embedding × algo) candidates with metrics using your existing utilities.
+
+    Works with:
+        - gridsearch_kmeans_params(X) -> {"params": {..., "n_clusters": ...}} or {..., "k": ...}
+        - gridsearch_agglomerative_params(X) -> {"params": {..., "n_clusters": ...}} or {..., "k": ...}
+        - gridsearch_dbscan(X) -> {"params": ..., "labels": ..., "metrics": ...}
+    """
     board = []
+
     for emb, X in datasets_map.items():
-        km_best = gridsearch_kmeans_params(X, ks=range(2, 6), n_inits=(10, 25))["params"]
+        # ----- KMEANS -----
+        km_res = gridsearch_kmeans_params(X, ks=range(2, 6), n_inits=(10, 25))
+        km_best = km_res.get("params") if isinstance(km_res, dict) else None
         if km_best:
-            km = build_model("kmeans", {"params": km_best, "n_clusters": km_best["k"]})
+            # support both new ("n_clusters") and old ("k") style
+            n_clusters_km = km_best.get("n_clusters", km_best.get("k"))
+            km = build_model("kmeans", {"params": km_best, "n_clusters": n_clusters_km})
             lab = km.fit_predict(X)
             m = internal_scores(X, lab)
-            board.append({"emb": emb, "algo": "kmeans", "params": km_best, "labels": lab, "metrics": m})
+            board.append({
+                "emb": emb,
+                "algo": "kmeans",
+                "params": km_best,
+                "labels": lab,
+                "metrics": m,
+            })
 
-        ag_best = gridsearch_agglomerative_params(X, ks=range(2, 6), linkages=("ward", "complete", "average"), metrics=("euclidean", "manhattan", "cosine"))["params"]
+        # ----- AGGLOMERATIVE -----
+        ag_res = gridsearch_agglomerative_params(
+            X,
+            ks=range(2, 6),
+            linkages=("ward", "complete", "average"),
+            metrics=("euclidean", "manhattan", "cosine"),
+        )
+        ag_best = ag_res.get("params") if isinstance(ag_res, dict) else None
         if ag_best:
-            ag = build_model("agglomerative", {"params": ag_best, "n_clusters": ag_best["k"]})
+            # support both "n_clusters" and "k"
+            n_clusters_ag = ag_best.get("n_clusters", ag_best.get("k"))
+            ag = build_model("agglomerative", {"params": ag_best, "n_clusters": n_clusters_ag})
             lab = ag.fit_predict(X)
             m = internal_scores(X, lab)
-            board.append({"emb": emb, "algo": "agglomerative", "params": ag_best, "labels": lab, "metrics": m})
+            board.append({
+                "emb": emb,
+                "algo": "agglomerative",
+                "params": ag_best,
+                "labels": lab,
+                "metrics": m,
+            })
 
+        # ----- DBSCAN -----
         db_best = gridsearch_dbscan(X)
         if db_best and db_best.get("params"):
-            board.append({"emb": emb, "algo": "dbscan", "params": db_best["params"], "labels": db_best["labels"], "metrics": db_best["metrics"]})
+            board.append({
+                "emb": emb,
+                "algo": "dbscan",
+                "params": db_best["params"],
+                "labels": db_best["labels"],
+                "metrics": db_best["metrics"],
+            })
+
     return board
+
 
 def rank_leaderboard(board):
     """Order candidates by your _score_internal (sil ↑, CH ↑, 1/(1+DB) ↑); tie-break: fewer clusters."""
@@ -89,7 +131,7 @@ def gridsearch_kmeans_params(X, ks=range(2, 11), n_inits=(10,25)):
     if idx is None:
         return {"params": None}
     best = df.loc[idx]
-    return {"params": {"k": int(best["k"]), "n_init": int(best["n_init"])}}
+    return {"params": {"n_clusters": int(best["k"]), "n_init": int(best["n_init"])}}
 
 def gridsearch_agglomerative_params(
     X,
@@ -112,7 +154,7 @@ def gridsearch_agglomerative_params(
     if idx is None:
         return {"params": None}
     best = df.loc[idx]
-    return {"params": {"k": int(best["k"]), "linkage": best["linkage"], "metric": best["metric"]}}
+    return {"params": {"n_clusters": int(best["k"]), "linkage": best["linkage"], "metric": best["metric"]}}
 
 
 def internal_scores(X: np.ndarray, labels: np.ndarray) -> Dict[str, Optional[float]]:
@@ -448,83 +490,40 @@ def top_union_smd_table(smd_df: pd.DataFrame, top_n: int = 8, feature_order: str
 
 def plot_smd_stacked_bars(
     smd_df: pd.DataFrame,
+    rank: int,
+    emb: str,
+    algo: str,
     top_n: int = 8,
-    use_abs: bool = True,
-    title: str | None = None,
-    legend_outside: bool = True,
 ):
-    """
-    Stacked horizontal bar chart:
-      - Each row = feature (union of top-N per cluster)
-      - Stacks = |SMD| values per cluster
-      - Shows relative cluster contributions to feature importance
-    """
-    # --- Step 1: Select union of top features ---
     top_feats = set()
-    for c in smd_df.columns:
-        top_feats |= set(smd_df[c].abs().nlargest(top_n).index)
+    for col in smd_df.columns:
+        top_feats |= set(smd_df[col].abs().nlargest(top_n).index)
     top_feats = list(top_feats)
 
     df_plot = smd_df.loc[top_feats].copy()
-    if use_abs:
-        df_plot = df_plot.abs()
-    df_plot = df_plot.fillna(0)
-
-    # --- Step 2: Order features by total discriminative strength ---
+    df_plot = df_plot.abs().fillna(0)
     df_plot["Total"] = df_plot.sum(axis=1)
-    df_plot = df_plot.sort_values("Total", ascending=True).drop(columns="Total")
+    df_plot = df_plot.sort_values("Total").drop(columns="Total")
 
-    # --- Step 3: Create stacked horizontal bar plot ---
-    fig, ax = plt.subplots(figsize=(10, 0.5 * len(df_plot) + 2))
-    df_plot.plot.barh(
-        stacked=True,
-        ax=ax,
-    )
-
-    ax.set_xlabel("|Standardized Mean Difference|" if use_abs else "Standardized Mean Difference")
-    ax.set_ylabel("")
-    ax.set_title(title or "Stacked |SMD| per Feature", pad=10)
-    ax.grid(axis="x", linestyle=":", alpha=0.6)
-
-    # --- Step 4: Optional legend positioning ---
-    if legend_outside: ax.legend(title="Cluster", bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0.)
-    else: ax.legend(title="Cluster")
-
+    df_plot.plot.barh(stacked=True)
+    plt.xlabel("|Standardized Mean Difference|")
+    plt.ylabel("")
+    plt.title(f"[{rank}] Stacked |SMD|s | {emb} – {algo}", pad=10)
+    plt.grid(axis="x", linestyle=":", alpha=0.6)
+    plt.legend(title="Cluster", bbox_to_anchor=(1.02, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
     
     
-def plot_smd_heatmap(smd_df, top_n=8, title=None, abs_values=True):
-    """
-    Heatmap-like plot showing SMDs for all clusters (rows = features, cols = clusters).
-    Much more readable than grouped/stacked bars.
-    """
-    top_feats = set()
-    for c in smd_df.columns:
-        top_feats |= set(smd_df[c].abs().nlargest(top_n).index)
-    top_feats = sorted(top_feats)
-
-    df_plot = smd_df.loc[top_feats].copy()
-    if abs_values:
-        df_plot = df_plot.abs()
-    df_plot = df_plot.loc[df_plot.max(axis=1).sort_values(ascending=False).index]
-
-    fig, ax = plt.subplots(figsize=(1.4 * len(df_plot.columns), 0.5 * len(df_plot)))
-    im = ax.imshow(df_plot, cmap="coolwarm", aspect="auto")
-
-    ax.set_xticks(np.arange(len(df_plot.columns)))
-    ax.set_yticks(np.arange(len(df_plot.index)))
-    ax.set_xticklabels(df_plot.columns, rotation=45, ha="right")
-    ax.set_yticklabels(df_plot.index)
-
-    plt.colorbar(im, ax=ax, shrink=0.7, label="|Standardized Mean Difference|" if abs_values else "SMD")
-
-    for i in range(len(df_plot.index)):
-        for j in range(len(df_plot.columns)):
-            val = df_plot.iloc[i, j]
-            if not np.isnan(val) and abs(val) > 0.05:
-                ax.text(j, i, f"{val:.2f}", ha="center", va="center", color="black", fontsize=8)
-
-    ax.set_title(title or "Top SMDs per Cluster", fontsize=12, pad=10)
+def plot_smd_heatmap(
+    smd_df: pd.DataFrame,
+    rank: int,
+    emb: str,
+    algo: str,
+):
+    sns.heatmap(smd_df, annot=True, fmt=".2f", cmap="coolwarm", center=0)
+    plt.title(f"[{rank}] Top SMDs by Cluster | {emb} – {algo}")
+    plt.ylabel("")
+    plt.xlabel("Cluster")
     plt.tight_layout()
     plt.show()
