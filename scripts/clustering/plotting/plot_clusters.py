@@ -36,6 +36,7 @@ def plot_clusters_target_3d(
 
     assert len(X) == len(cl) == len(yt)
 
+    color_map = { 0: "#0077BB", 1:"#EE7733"}
     marker_cycle = ["circle", "square", "diamond", "cross", "x", "triangle-up", "triangle-down"]
     unique_clusters = sorted(np.unique(cl))
     marker_map = {c: marker_cycle[i % len(marker_cycle)] for i, c in enumerate(unique_clusters)}
@@ -46,8 +47,7 @@ def plot_clusters_target_3d(
     for c in unique_clusters:
         for t in unique_targets:
             mask = (cl == c) & (yt == t)
-            if not np.any(mask): continue
-
+            if np.any(mask): color = color_map.get(int(t), "#555555")
             fig.add_trace(
                 go.Scatter3d(
                     x=X[mask, 0],
@@ -56,6 +56,7 @@ def plot_clusters_target_3d(
                     mode="markers",
                     marker=dict(
                         size=5,
+                        color=color,
                         opacity=0.8,
                         symbol=marker_map[c],
                         line=dict(color="white", width=0.8),
