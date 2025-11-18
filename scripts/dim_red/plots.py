@@ -1,23 +1,8 @@
 import numpy as np, pandas as pd, matplotlib.pyplot as plt, plotly.graph_objects as go
-from typing import Any, Optional, Sequence
-from sklearn.manifold import trustworthiness
-from sklearn.model_selection import StratifiedKFold, cross_val_score
-from sklearn.linear_model import LogisticRegression
-from sklearn.base import ClassifierMixin
+from typing import Sequence
+from .utils import to_numpy
 
 
-# ---------------------------------------------------------------------
-# Helper
-# ---------------------------------------------------------------------
-def _to_numpy(x: pd.DataFrame | pd.Series | np.ndarray) -> np.ndarray:
-    if isinstance(x, (pd.DataFrame, pd.Series)):
-        return x.to_numpy()
-    return np.asarray(x)
-
-
-# ---------------------------------------------------------------------
-# Plots
-# ---------------------------------------------------------------------
 def plot_cumulative_variance(
     explained_variance: Sequence[float],
     show_target: float | None = 0.95,
@@ -29,7 +14,7 @@ def plot_cumulative_variance(
     cumulative = np.cumsum(ev)
     components = np.arange(1, len(ev) + 1)
 
-    plt.figure(figsize=(7,4))
+    plt.figure(figsize=(7, 4))
     plt.plot(components, cumulative, marker="o")
     plt.xlabel("Number of Components")
     plt.xticks(components)
@@ -62,9 +47,9 @@ def plot_3d(
     """
     Interactive 3D scatter (Plotly) for dimensionality reduction results.
     """
-    X = _to_numpy(X3d)
-    y_series = pd.Series(_to_numpy(y)).reset_index(drop=True)
-    
+    X = to_numpy(X3d)
+    y_series = pd.Series(to_numpy(y)).reset_index(drop=True)
+
     classes = pd.Index(sorted(y_series.unique(), key=lambda v: str(v)))
     labels_xyz = ["Component 1", "Component 2", "Component 3"]
 
@@ -116,48 +101,5 @@ def plot_3d(
 
     if show:
         fig.show()
+
     return fig
-
-
-# ---------------------------------------------------------------------
-# Evaluation
-# ---------------------------------------------------------------------
-def eval_embedding(
-    name: str,
-    Z: np.ndarray | pd.DataFrame,
-    y: np.ndarray | pd.Series,
-    X_ref: Optional[np.ndarray | pd.DataFrame] = None,
-    *,
-    k: int = 10,
-    cv_splits: int = 5,
-    clf: Optional[ClassifierMixin] = None,
-    random_state: int = 42,
-) -> dict[str, Any]:
-    """
-    Evaluate a 2D/3D embedding.
-
-    Metrics
-    -------
-    - Trustworthiness@k (if X_ref provided)
-    - CV ROC-AUC of a simple classifier trained on Z (default: LogisticRegression)
-    """
-    Z_np = _to_numpy(Z)
-    y_np = _to_numpy(y).ravel()
-
-    # Classifier for linear separability probe
-    clf = clf or LogisticRegression(max_iter=5000, random_state=random_state)
-
-    cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=random_state)
-    cv_auc = cross_val_score(clf, Z_np, y_np, cv=cv, scoring="roc_auc").mean()
-
-    out: dict[str, Any] = {
-        "Embedding": name,
-        "Classifier": clf.__class__.__name__,
-        "CV ROC-AUC": float(cv_auc),
-    }
-
-    if X_ref is not None:
-        X_np = _to_numpy(X_ref)
-        k_eff = min(k, max(1, len(X_np) - 1))
-        out[f"Trustworthiness@{k_eff}"] = float(trustworthiness(X_np, Z_np, n_neighbors=k_eff))
-    return out

@@ -19,6 +19,12 @@ reporting.py
     Lightweight reporting helpers that summarize dataset characteristics,
     unique values, class distributions, and create data dictionaries for export.
 """
+
+# --- Cleaning & preprocessing pipelines --------------------------------------
+from .cleaning.pipeline import build_cleaning_pipeline
+from .preprocessing.pipeline import build_preprocessing_pipeline
+
+# --- Plot helpers ------------------------------------------------------------
 from .plots import (
     create_plot_grid,
     plot_index_vs_columns,
@@ -31,33 +37,38 @@ from .plots import (
     plot_mutual_info,
 )
 
-from .stats import (
-    calculate_skewness,
-    compute_mutual_info,
-)
-
+# --- Reporting helpers -------------------------------------------------------
 from .reporting import (
     describe_unique_values,
     class_distribution_table,
     create_data_dictionary,
 )
 
+# --- Statistical helpers -----------------------------------------------------
+from .stats import (
+    calculate_skewness,
+    compute_mutual_info,
+)
+
 __all__ = [
-    # Plotting
+    # pipelines
+    "build_cleaning_pipeline",
+    "build_preprocessing_pipeline",
+    # plots
     "create_plot_grid",
     "plot_index_vs_columns",
     "plot_violins",
+    "plot_violins_binary",
     "plot_histograms_with_kde",
+    "plot_correlation_heatmap",
     "plot_pairplot_with_hue",
     "plot_class_distribution",
     "plot_mutual_info",
-
-    # Statistical analysis
-    "calculate_skewness",
-    "compute_mutual_info",
-
-    # Reporting and summaries
+    # reporting
     "describe_unique_values",
     "class_distribution_table",
     "create_data_dictionary",
+    # stats
+    "calculate_skewness",
+    "compute_mutual_info",
 ]
