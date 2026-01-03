@@ -3,7 +3,7 @@
 This project focuses on **predicting the risk of cardiovascular disease (CVD)** using a variety of supervised learning algorithms, including **Random Forest**, **AdaBoost**, **XGBoost**, **Naive Bayes**, **Support Vector Machine (SVM)**, and **Logistic Regression**.  
 It also explores **ensemble methods** such as **Stacking** and **Soft Voting**, along with dimensionality reduction techniques like **PCA**, **t-SNE**, and **UMAP**.  
 
-The workflow covers the entire pipeline — from **data cleaning**, **exploratory data analysis (EDA)**, and **preprocessing**, to **model training**, **evaluation**, **clustering**, and **interpretation** of results.
+The workflow covers the entire pipeline — from **data cleaning**, **exploratory data analysis (EDA)**, and **preprocessing**, to **model training**, **evaluation**, **clustering**, and **intergratation** of results.
 
 ## 🎯 Objective & Motivation
 
@@ -138,7 +138,7 @@ pip install -r requirements.txt
 - `notebooks/dim_red.ipynb` – Apply PCA, t-SNE, and UMAP  
 - `notebooks/clustering.ipynb` – Visualize unsupervised grouping patterns  
 - `notebooks/model_training.ipynb` – Train and evaluate classification models  
-- `notebooks/integration.ipynb` – Train and evaluate classification models trained on low-dimensional embeddings.  
+- `notebooks/integration.ipynb` – Train, evaluate and visualise classification models trained on low-dimensional embeddings.  
 
 
 Outputs (e.g. trained models) are automatically saved in the `outputs/` directory.
@@ -149,7 +149,7 @@ Outputs (e.g. trained models) are automatically saved in the `outputs/` director
 3. **Dimensionality Reduction** – Visualize structure in low-dimensional space
 4. **Model Training & Evaluation** – Train and compare multiple ML models
 5. **Clustering & Insights** – Explore patterns and patient group similarities
-6. **Integration of the Results** - Combination of dimensionality reduction with ML models
+6. **Integration of the Results** - Combination of dimensionality reduction with ML models - training, evaluation and visualisation
 
 
 ## 🧠 Models Used
@@ -167,14 +167,17 @@ Outputs (e.g. trained models) are automatically saved in the `outputs/` director
 - Soft Voting Classifier
 
 **Dimensionality Reduction**
+- Linear Methods
+  - Principal Component Analysis (PCA)
+  - Linear Discriminant Analysis (LDA)
 - Non-linear Unsupervised Methods
   - t-Distributed Stochastic Neighbor Embedding (t-SNE)
   - Uniform Manifold Approximation and Projection (UMAP)
-  - Hybrid Multi-stage Pipelines
-- Supervised and Hybrid Non-linear Methods
-  Supervised UMAP
-  Semi-supervised UMAP
-  XGBoost Leaf-Embedding + UMAP Projection
+- Non-linear Supervised and Hybrid Methods
+  - Supervised UMAP
+  - Semi-supervised UMAP
+  - Hybrid Method (UMAP1, UMAP2, LDA1)
+  - XGBoost Leaf-Embedding + UMAP Projection
 
 **Clustering**
 - K-Means
@@ -258,12 +261,34 @@ This indicates **excellent sensitivity** and very strong generalization on this 
 - Clusters often look separated visually, but they mainly reflect **gradual changes** in these variables.
 - No stable or meaningful “third group” is observed.
 
+## 📚 Integration Results (Embeddings + Models)
+
+| Embedding | Model | Accuracy | Balanced Accuracy | F1 | ROC AUC |
+|---------|-------|----------|-------------------|----|---------|
+| Baseline | Stacking | 0.9355 | 0.9396 | 0.9091 | 0.9803 |
+| MIX(UMAP1,UMAP2,LDA1) | Voting | 0.9355 | 0.9280 | 0.9048 | 0.9628 |
+| MIX(UMAP1,UMAP2,LDA1) | RandomForest | 0.9355 | 0.9280 | 0.9048 | 0.9524 |
+| MIX(UMAP1,UMAP2,LDA1) | Stacking | 0.9194 | 0.9158 | 0.8837 | 0.9570 |
+| MIX(UMAP1,UMAP2,LDA1) | Logistic Regression | 0.9194 | 0.9042 | 0.8780 | 0.9617 |
+| Baseline | XGBoost | 0.9194 | 0.9042 | 0.8780 | 0.9652 |
+| Baseline | Logistic Regression | 0.9194 | 0.9042 | 0.8780 | 0.9652 |
+| Baseline | SVM | 0.9032 | 0.8920 | 0.8571 | 0.9489 |
+| MIX(UMAP1,UMAP2,LDA1) | Naive Bayes | 0.9032 | 0.8920 | 0.8571 | 0.9512 |
+| Baseline | RandomForest | 0.9032 | 0.8804 | 0.8500 | 0.9849 |
+
+- The best overall result is **Baseline | Stacking** – highest accuracy, balanced accuracy, F1, and ROC AUC.
+- Using the **MIX (UMAP + LDA)** embedding does **not improve** results over the baseline.
+- Voting and RandomForest with MIX reach similar accuracy, but lower balanced accuracy and ROC AUC.  
+- Stacking works best **without embeddings** – adding MIX slightly hurts performance.
+- Logistic Regression and XGBoost perform similarly in baseline and MIX setups.  
+- SVM and Naive Bayes are clearly weaker than ensemble models.
+
 ## ✨ Key Insights
 - Clinical structure is **consistent across embeddings and clustering methods**.  
 - Dominant axes: kidney function, cardiac function, disease progression, age.  
 - Unsupervised methods still form meaningful medical subgroups.  
 - Supervised embeddings provide excellent discrimination and reveal patients hardest to classify.
-
+- **Complex embeddings are not needed** – the baseline feature space is enough.
 
 ## 🚀 Future Work
 - Integrate SHAP and LIME for explainable AI insights
