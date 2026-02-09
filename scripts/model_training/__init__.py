@@ -13,9 +13,12 @@ from .evaluation import (
 )
 from .ensembles import best_soft_voting_setup
 
+from .plots import plot_oof_probability_distributions
+
 __all__ = [
     "oof_scores",
     "evaluate_classification",
     "find_best_threshold",
     "best_soft_voting_setup",
+    "plot_oof_probability_distributions",
 ]
